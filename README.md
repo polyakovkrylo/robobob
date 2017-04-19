@@ -1,7 +1,5 @@
-﻿Mein Dorobo32-Projekt
-=====================
+# Robobob project
 
-Tragen Sie hier alles Wissenswerte zu Ihrem Projekt ein!
+Project aims to design a IR navigating self driving  robot.
 
-
-Ja!
+**Booyaka!**
