@@ -13,15 +13,22 @@ int irRight = 0;
 int lastSeen = LEFT_DIRECTION;
 int blindCounter = 0;
 
-bool isTargetLost()
+void updateBlindCounter()
 {
   if(min(irLeft, irRight) < IR_TARGET_VALUE) {
-    if(++blindCounter > BLIND_COUNTER_MAX)
-      return true;
+    blindCounter++;
   } else {
     blindCounter = 0;
   }
-  return false
+}
+
+bool isTargetLost()
+{
+  updateBlindCounter();
+  if(blindCounter > BLIND_COUNTER_MAX)
+    return true;
+  else
+    return false;
 }
 
 #endif

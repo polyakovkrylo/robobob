@@ -29,26 +29,36 @@
 #define DIST_SENSOR_MAX							3600
 #define DIST_SENSOR_MIN							300
 #define DIST_SENSOR_OBSTACLE_VALUE	400
+#define DIST_ARRAY_SIZE							10
 
 enum States{
 	NoTarget,
 	Grabbing,
 	OnCourse,
 	ObstacleDetected,
-	Avoiding,
-	ReturningOnCourse
+	CollisionDetected,
+	Avoiding
 };
 
 // System state
 int currentState = NoTarget;
 
 // Distance meters
-int lDistanceMeter = 0;
+const int lDistanceMeter = 1;
+const int rDistanceMeter = 2;
+const int triggeredDistanceMeter = 0;
+int avDistanceValues[3] = 0;
+int lDistanceValues[DIST_ARRAY_SIZE] = 0;
+int rDistanceValues[DIST_ARRAY_SIZE] = 0;
+int it_currentValueIndex = 0;
 
+// Collision Sensors
+int triggeredCollisionSensor = 0;
 
+void setState(int state);
 static void irTask(void *pvParameters);
 static void mainTask(void *pvParameters);
-void setState(int state);
+static void distanceTask(void *pvParameters);
 
 int main() {
 	// Initialization
@@ -64,10 +74,78 @@ int main() {
   // digital_configure_pin(IR_RIGHT, DD_CFG_INPUT_NOPULL);
 
   xTaskCreate(mainTask, "mainTask", 256, NULL, 2, NULL);
-  xTaskCreate(irTask, "irTask", 256, NULL, 3, NULL);
+  xTaskCreate(irTask, "irTask", 256, NULL, 4, NULL);
+	xTaskCreate(distanceTask, "distanceTask", 256, NULL, 3, NULL);
 
 	vTaskStartScheduler();	//start the freertos scheduler
 	return 0;								//should not be reached!
+}
+
+void setState(int state) {
+	tracef("new state: %d", state);
+	currentState = state;
+
+  // Do entering routine
+  switch(state) {
+
+		case NoTarget:
+			stop();
+      turn(50 * lastSeen);
+		break;
+
+		case Grabbing:
+      turn(0);
+    break;
+
+    case onCourse:
+      turn(0);
+      start(60);
+    break;
+
+		case ObstacleDetected:
+			stop();
+			if(triggeredDistanceMeter == lDistanceMeter)
+				start(30, LEFT_DIRECTION);
+			else
+				start(30, RIGHT_DIRECTION);
+			setState(Avoiding);
+		break;
+
+		case CollisionDetected:
+			stop();
+			turn(90 * triggeredCollisionSensor);
+			vTaskDelay(30);
+			start(60);
+			vTaskDelay(100);
+			setState(Avoiding);
+		break;
+  }
+}
+
+static void distanceTask(void *pvParameters) {
+	// Read sensors
+	rDistanceValues[it_currentValueIndex] = adc_get_value(DISTANCE_METER_RIGHT);
+	lDistanceValues[it_currentValueIndex] = adc_get_value(DISTANCE_METER_LEF);
+
+	// Calculate average
+	int lSum = 0, rSum = 0;
+	for (int i = 0; i < DIST_ARRAY_SIZE; i++) {
+		lSum += lDistanceValues[i];
+		rSum += rDistanceValues[i];
+	}
+	avDistanceValues[lDistanceMeter] = lSum / DIST_ARRAY_SIZE;
+	avDistanceValues[rDistanceMeter] = lSum / DIST_ARRAY_SIZE;
+
+	// Check if obstacle was detected
+	if(avDistanceValues[lDistanceMeter] > OBSTACLE_VALUE) {
+		triggeredDistanceMeter = lDistanceMeter;
+	} else if(avDistanceValues[rDistanceMeter] > OBSTACLE_VALUE) {
+		triggeredDistanceMeter = rDistanceMeter;
+	} else {
+		triggeredDistanceMeter = 0;
+	}
+
+	it = (++it) % DIST_ARRAY_SIZE; //moving the iterator
 }
 
 static void irTask(void *pvParameters) {
@@ -101,29 +179,6 @@ static void irTask(void *pvParameters) {
 	}
 }
 
-void setState(int state) {
-	tracef("new state: %d", state);
-	currentState = state;
-
-  // Do entering routine
-  switch(state) {
-
-		case NoTarget:
-			stop();
-      turn(50 * lastSeen);
-		break;
-
-		case onCourse:
-      turn(0);
-    break;
-
-    case onCourse:
-      turn(0);
-      start(60);
-    break;
-  }
-}
-
 static void mainTask(void *pvParameters){
 	// Motor initialization
 	motor_init();
@@ -137,10 +192,7 @@ static void mainTask(void *pvParameters){
 		break;
 
 		case Grabbing:
-			// Move it to different task !!!!!!!!!!
-			if((adc_get_value(DISTANCE_METER_RIGHT)>DIST_SENSOR_OBSTACLE_VALUE)||
-				(digital_get_pin(COLLISSION_SENSOR_RIGHT)==DD_LEVEL_LOW)||
-				(digital_get_pin(COLLISSION_SENSOR_LEFT)==DD_LEVEL_LOW)) {
+			if(triggeredDistanceMeter != 0) {
 				setState(ObstacleDetected);
 				continue;
 			}
@@ -157,15 +209,10 @@ static void mainTask(void *pvParameters){
 
 			if(isTargetLost())
 				setState(NoTarget);
-
 		break;
 
 		case OnCourse:
-			start(60);
-			//tracef("distance sensor: %d", adc_get_value(DISTANCE_METER_RIGHT));
-			if((adc_get_value(DISTANCE_METER_RIGHT)>DIST_SENSOR_OBSTACLE_VALUE)||
-				(digital_get_pin(COLLISSION_SENSOR_RIGHT)==DD_LEVEL_LOW)||
-				(digital_get_pin(COLLISSION_SENSOR_LEFT)==DD_LEVEL_LOW)) {
+			if(triggeredDistanceMeter != 0) {
 				setState(ObstacleDetected);
 				continue;
 			}
@@ -179,18 +226,16 @@ static void mainTask(void *pvParameters){
 			}
 		break;
 
-		case ObstacleDetected:
-			if(digital_get_pin(COLLISSION_SENSOR_RIGHT)==DD_LEVEL_LOW){
+		case Avoiding:
+			updateBlindCounter();
+			if(avDistanceValues[triggeredDistanceMeter] < OBSTACLE_VALUE) {
 				stop();
-				turn(90);
+				setState(Grabbing);
 			}
-			else if(digital_get_pin(COLLISSION_SENSOR_LEFT)==DD_LEVEL_LOW){
-				stop();
-				turn(-90);
-			}
-			setState(Grabbing);
 		break;
+
 		}
+
 		vTaskDelay(20);
 	}
 }
