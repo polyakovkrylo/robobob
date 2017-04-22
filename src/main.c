@@ -116,7 +116,7 @@ void setState(int state) {
 
 	case CollisionDetected:
 		stop();
-		start(40,collisionSide);
+		start(-40,collisionSide);	// Move back to oposite side
 		vTaskDelay(25);
 		setState(Avoiding);
 		break;
