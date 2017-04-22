@@ -21,15 +21,15 @@
 
 #define COLLISSION_SENSOR_LEFT					DD_PIN_PD14
 #define COLLISSION_SENSOR_RIGHT					DD_PIN_PD15
-#define IR_LEFT									DD_PIN_PC8
-#define IR_RIGHT								DD_PIN_PC9
+#define IR_LEFT							DD_PIN_PC8
+#define IR_RIGHT						DD_PIN_PC9
 #define DISTANCE_METER_RIGHT					DA_ADC_CHANNEL0
-#define DISTANCE_METER_LEFT						DA_ADC_CHANNEL1
+#define DISTANCE_METER_LEFT					DA_ADC_CHANNEL1
 
-#define DIST_SENSOR_MAX							3600
-#define DIST_SENSOR_MIN							300
+#define DIST_SENSOR_MAX						3600
+#define DIST_SENSOR_MIN						250
 #define DIST_SENSOR_OBSTACLE_VALUE				600
-#define DIST_ARRAY_SIZE							10
+#define DIST_ARRAY_SIZE						10
 
 enum States{
 	NoTarget,
@@ -71,11 +71,11 @@ int main() {
 	// Pin configuration
 	digital_configure_pin(COLLISSION_SENSOR_LEFT, DD_CFG_INPUT_PULLUP);
 	digital_configure_pin(COLLISSION_SENSOR_RIGHT, DD_CFG_INPUT_PULLUP);
-	//digital_configure_pin(IR_LEFT, DD_CFG_INPUT_NOPULL);
-	//digital_configure_pin(IR_RIGHT, DD_CFG_INPUT_NOPULL);
 
+	// Set initial state
 	setState(NoTarget);
 
+	// Crete tasks
 	xTaskCreate(mainTask, "mainTask", 256, NULL, 2, NULL);
 	xTaskCreate(irTask, "irTask", 256, NULL, 2, NULL);
 	xTaskCreate(distanceTask, "distanceTask", 256, NULL, 2, NULL);
@@ -90,21 +90,20 @@ void setState(int state) {
 
 	// Do entering routine
 	switch(state) {
-
 	case NoTarget:
 		resetBlindCounter();
 		stop();
 		turn(35 * lastSeen);
-	break;
+		break;
 
 	case Adjusting:
-      turn(0);
-    break;
+      		turn(0);
+    		break;
 
-    case OnCourse:
-      turn(0);
-      start(60,0);
-    break;
+   	case OnCourse:
+      		turn(0);
+      		start(60,0);
+    		break;
 
 	case ObstacleDetected:
 		stop();
@@ -113,16 +112,14 @@ void setState(int state) {
 		else
 			start(50, RIGHT_DIRECTION);
 		setState(Avoiding);
-	break;
+		break;
 
 	case CollisionDetected:
 		stop();
-		turn(90 * collisionSide);
-		vTaskDelay(30);
-		start(40,0);
+		start(40,collisionSide);
 		vTaskDelay(25);
 		setState(Avoiding);
-	break;
+		break;
   }
 }
 
@@ -130,24 +127,22 @@ static void distanceTask(void *pvParameters) {
 	// Read sensors
 
 	while(1){
-
-		if(currentState!=CollisionDetected){
-			if(digital_get_pin(COLLISSION_SENSOR_LEFT)==DD_LEVEL_LOW){
-				collisionSide=RIGHT_DIRECTION;
-				setState(CollisionDetected);
-			}
-
-			else if(digital_get_pin(COLLISSION_SENSOR_RIGHT)==DD_LEVEL_LOW){
-				collisionSide=LEFT_DIRECTION;
-				setState(CollisionDetected);
-			}
-
+		// If switch is pushed, go to CollisionDetected state
+		if(digital_get_pin(COLLISSION_SENSOR_LEFT)==DD_LEVEL_LOW){
+			collisionSide=RIGHT_DIRECTION;
+			setState(CollisionDetected);
 		}
 
+		else if(digital_get_pin(COLLISSION_SENSOR_RIGHT)==DD_LEVEL_LOW){
+			collisionSide=LEFT_DIRECTION;
+			setState(CollisionDetected);
+		}
+
+		// Read distance sensors
 		rDistanceValues[it_currentValueIndex] = adc_get_value(DISTANCE_METER_RIGHT);
 		lDistanceValues[it_currentValueIndex] = adc_get_value(DISTANCE_METER_LEFT);
 
-		// Calculate average+
+		// Calculate average
 		int rSum = 0;
 		int lSum = 0;
 		for (int i = 0; i < DIST_ARRAY_SIZE; i++) {
@@ -166,7 +161,8 @@ static void distanceTask(void *pvParameters) {
 			triggeredDistanceMeter = 0;
 		}
 
-		it_currentValueIndex = (++it_currentValueIndex) % DIST_ARRAY_SIZE; //moving the iterator
+		// Update the iterator
+		it_currentValueIndex = (++it_currentValueIndex) % DIST_ARRAY_SIZE; 
 
 		vTaskDelay(20);
 	}
@@ -208,12 +204,10 @@ static void mainTask(void *pvParameters){
 
 	while(1){
 		switch(currentState){
-
 		case NoTarget:
-			//tracef("IR: %d", max(irLeft, irRight));
 			if(max(irLeft, irRight) > IR_TARGET_VALUE)
 				setState(Adjusting);
-		break;
+			break;
 
 		case Adjusting:
 			if(triggeredDistanceMeter != 0) {
@@ -225,6 +219,7 @@ static void mainTask(void *pvParameters){
 				setState(OnCourse);
 				continue;
 			}
+				
 			int angSp = 15;
 			if(irLeft<irRight){
 				angSp = -angSp;
@@ -236,7 +231,7 @@ static void mainTask(void *pvParameters){
 
 			if(isTargetLost())
 				setState(NoTarget);
-		break;
+			break;
 
 		case OnCourse:
 			if(triggeredDistanceMeter != 0) {
@@ -251,7 +246,7 @@ static void mainTask(void *pvParameters){
 			if(isTargetLost()) {
 				setState(NoTarget);
 			}
-		break;
+			break;
 
 		case Avoiding:
 			updateBlindCounter();
@@ -259,8 +254,7 @@ static void mainTask(void *pvParameters){
 				stop();
 				setState(Adjusting);
 			}
-		break;
-
+			break;
 		}
 
 		vTaskDelay(20);
