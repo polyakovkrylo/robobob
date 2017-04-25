@@ -2,10 +2,10 @@
 #define TARGETING_H_
 
 #define IR_MAX									1710
-#define IR_TARGET_VALUE							400
+#define IR_TARGET_VALUE							700
 #define IR_MIN_DIFF								250
 
-#define BLIND_COUNTER_MAX           			30
+#define BLIND_COUNTER_MAX           			20
 
 // IR Sensors
 int irLeft = 0;
@@ -29,7 +29,6 @@ void resetBlindCounter()
 
 bool isTargetLost()
 {
-  updateBlindCounter();
   if(blindCounter > BLIND_COUNTER_MAX)
     return true;
   else
