@@ -5,7 +5,7 @@
 #define IR_TARGET_VALUE							400
 #define IR_MIN_DIFF								250
 
-#define BLIND_COUNTER_MAX           			25
+#define BLIND_COUNTER_MAX           			30
 
 // IR Sensors
 int irLeft = 0;

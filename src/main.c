@@ -19,17 +19,17 @@
 #include "movement.h"
 #include "targerting.h"
 
-#define COLLISSION_SENSOR_LEFT					DD_PIN_PD14
-#define COLLISSION_SENSOR_RIGHT					DD_PIN_PD15
-#define IR_LEFT							DD_PIN_PC8
-#define IR_RIGHT						DD_PIN_PC9
-#define DISTANCE_METER_RIGHT					DA_ADC_CHANNEL0
+#define COLLISSION_SENSOR_LEFT				DD_PIN_PD14
+#define COLLISSION_SENSOR_RIGHT				DD_PIN_PD15
+#define IR_LEFT								DD_PIN_PC8
+#define IR_RIGHT							DD_PIN_PC9
+#define DISTANCE_METER_RIGHT				DA_ADC_CHANNEL0
 #define DISTANCE_METER_LEFT					DA_ADC_CHANNEL1
 
 #define DIST_SENSOR_MAX						3600
 #define DIST_SENSOR_MIN						250
-#define DIST_SENSOR_OBSTACLE_VALUE				600
-#define DIST_ARRAY_SIZE						10
+#define DIST_SENSOR_OBSTACLE_VALUE			600
+#define DIST_ARRAY_SIZE						4
 
 enum States{
 	NoTarget,
@@ -47,6 +47,7 @@ int currentState = NoTarget;
 const int lDistanceMeter = 1;
 const int rDistanceMeter = 2;
 int triggeredDistanceMeter = 0;
+int currentObstacleDistanceMeter = 0;
 int avDistanceValues[3]={0};
 int lDistanceValues[DIST_ARRAY_SIZE] = {0};
 int rDistanceValues[DIST_ARRAY_SIZE] = {0};
@@ -102,22 +103,25 @@ void setState(int state) {
 
    	case OnCourse:
       		turn(0);
-      		start(60,0);
+      		start(85,0);
     		break;
 
 	case ObstacleDetected:
 		stop();
-		if(triggeredDistanceMeter == lDistanceMeter)
-			start(50, LEFT_DIRECTION);
+
+		currentObstacleDistanceMeter = triggeredDistanceMeter;
+
+		if(currentObstacleDistanceMeter == lDistanceMeter)
+			start(85, LEFT_DIRECTION);
 		else
-			start(50, RIGHT_DIRECTION);
+			start(85  , RIGHT_DIRECTION);
 		setState(Avoiding);
 		break;
 
 	case CollisionDetected:
 		stop();
-		start(-40,collisionSide);	// Move back to oposite side
-		vTaskDelay(25);
+		start(-60,collisionSide);	// Move back to opposite side
+		vTaskDelay(150);
 		setState(Avoiding);
 		break;
   }
@@ -128,16 +132,17 @@ static void distanceTask(void *pvParameters) {
 
 	while(1){
 		// If switch is pushed, go to CollisionDetected state
-		if(digital_get_pin(COLLISSION_SENSOR_LEFT)==DD_LEVEL_LOW){
-			collisionSide=RIGHT_DIRECTION;
-			setState(CollisionDetected);
-		}
+		if(currentState!=CollisionDetected){
+			if(digital_get_pin(COLLISSION_SENSOR_LEFT)==DD_LEVEL_LOW){
+				collisionSide=RIGHT_DIRECTION;
+				setState(CollisionDetected);
+			}
 
-		else if(digital_get_pin(COLLISSION_SENSOR_RIGHT)==DD_LEVEL_LOW){
-			collisionSide=LEFT_DIRECTION;
-			setState(CollisionDetected);
+			else if(digital_get_pin(COLLISSION_SENSOR_RIGHT)==DD_LEVEL_LOW){
+				collisionSide=LEFT_DIRECTION;
+				setState(CollisionDetected);
+			}
 		}
-
 		// Read distance sensors
 		rDistanceValues[it_currentValueIndex] = adc_get_value(DISTANCE_METER_RIGHT);
 		lDistanceValues[it_currentValueIndex] = adc_get_value(DISTANCE_METER_LEFT);
@@ -153,10 +158,12 @@ static void distanceTask(void *pvParameters) {
 		avDistanceValues[rDistanceMeter] = rSum / DIST_ARRAY_SIZE;
 
 		// Check if obstacle was detected
-		if(avDistanceValues[lDistanceMeter] > DIST_SENSOR_OBSTACLE_VALUE) {
-			triggeredDistanceMeter = lDistanceMeter;
-		} else if(avDistanceValues[rDistanceMeter] > DIST_SENSOR_OBSTACLE_VALUE) {
-			triggeredDistanceMeter = rDistanceMeter;
+		if(max(avDistanceValues[rDistanceMeter],avDistanceValues[lDistanceMeter]) > DIST_SENSOR_OBSTACLE_VALUE) {
+			if(avDistanceValues[rDistanceMeter] > avDistanceValues[lDistanceMeter]) {
+				triggeredDistanceMeter = rDistanceMeter;
+			} else {
+				triggeredDistanceMeter = lDistanceMeter;
+			}
 		} else {
 			triggeredDistanceMeter = 0;
 		}
@@ -164,7 +171,7 @@ static void distanceTask(void *pvParameters) {
 		// Update the iterator
 		it_currentValueIndex = (++it_currentValueIndex) % DIST_ARRAY_SIZE; 
 
-		vTaskDelay(20);
+		vTaskDelay(10);
 	}
 }
 
@@ -225,7 +232,7 @@ static void mainTask(void *pvParameters){
 				angSp = -angSp;
 			}
 			if(isStarted) {
-				angSp *= 3;
+				angSp *= 5;
 			}
 			turn(angSp);
 
@@ -250,9 +257,14 @@ static void mainTask(void *pvParameters){
 
 		case Avoiding:
 			updateBlindCounter();
-			if(avDistanceValues[triggeredDistanceMeter] < DIST_SENSOR_OBSTACLE_VALUE) {
+
+			if(currentObstacleDistanceMeter != triggeredDistanceMeter) {
+				setState(ObstacleDetected);
+			}
+
+			if(avDistanceValues[currentObstacleDistanceMeter] < DIST_SENSOR_OBSTACLE_VALUE) {
 				stop();
-				setState(Adjusting);
+				setState(OnCourse);
 			}
 			break;
 		}
