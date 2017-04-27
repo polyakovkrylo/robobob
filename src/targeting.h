@@ -2,16 +2,20 @@
 #define TARGETING_H_
 
 #define IR_MAX									1710
-#define IR_TARGET_VALUE							700
-#define IR_MIN_DIFF								250
+#define IR_TARGET_VALUE							800
+#define IR_MIN_DIFF								150
 
-#define BLIND_COUNTER_MAX           			20
+#define BLIND_COUNTER_MAX           			25
+#define FALSE_TARGET_COUNTER_MAX        		10
 
 // IR Sensors
 int irLeft = 0;
 int irRight = 0;
+
 int lastSeen = LEFT_DIRECTION;
 int blindCounter = 0;
+
+int falseTargetCounter = 0;
 
 void updateBlindCounter()
 {
@@ -29,10 +33,17 @@ void resetBlindCounter()
 
 bool isTargetLost()
 {
-  if(blindCounter > BLIND_COUNTER_MAX)
-    return true;
-  else
-    return false;
+	return (blindCounter > BLIND_COUNTER_MAX);
+}
+
+bool isFalseTarget() {
+	if(max(irLeft, irRight) < (IR_MAX - IR_MIN_DIFF))
+		falseTargetCounter++;
+	return falseTargetCounter > FALSE_TARGET_COUNTER_MAX;
+}
+
+void resetFalseTargetCounter() {
+	falseTargetCounter = 0;
 }
 
 #endif

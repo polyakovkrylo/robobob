@@ -1,6 +1,7 @@
 #ifndef MOVEMENT_H_
 #define MOVEMENT_H_
 
+
 #define LEFT_DIRECTION						1
 #define RIGHT_DIRECTION						-1
 
@@ -12,7 +13,6 @@ void turn(int angularSpeed) {
 		motor_set(DM_MOTOR1, angularSpeed);
 		motor_set(DM_MOTOR2, angularSpeed);
 	}
-	//vTaskDelay(5);
 }
 
 void start(int speed, int direction) {
@@ -20,11 +20,15 @@ void start(int speed, int direction) {
 		case RIGHT_DIRECTION:
 		motor_set(DM_MOTOR1, speed);
 		motor_set(DM_MOTOR0, -speed);
+		// for turning while moving
+		motor_set(DM_MOTOR2, speed/5);
 		break;
 
 		case LEFT_DIRECTION:
 		motor_set(DM_MOTOR0, speed);
 		motor_set(DM_MOTOR2, -speed);
+		// for turning while moving
+		motor_set(DM_MOTOR1, -speed/5);
 		break;
 
 		default:
@@ -34,7 +38,6 @@ void start(int speed, int direction) {
 	}
 
 	isStarted = (speed > 0) ? true : false;
-	//vTaskDelay(5);
 }
 
 void stop() {

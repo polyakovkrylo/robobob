@@ -30,8 +30,9 @@
 
 #define DIST_SENSOR_MAX						3600
 #define DIST_SENSOR_MIN						250
-#define DIST_SENSOR_OBSTACLE_VALUE			600
+#define DIST_SENSOR_OBSTACLE_VALUE			800
 #define DIST_ARRAY_SIZE						5
+#define IR_ARRAY_SIZE						2
 
 enum States{
 	NoTarget,
@@ -39,7 +40,9 @@ enum States{
 	OnCourse,
 	ObstacleDetected,
 	CollisionDetected,
-	Avoiding
+	Avoiding,
+	FalseTarget,
+	ChangingPosition
 };
 
 // System state
@@ -48,12 +51,18 @@ int currentState = NoTarget;
 // Distance meters
 const int lDistanceMeter = 1;
 const int rDistanceMeter = 2;
+const int rIr=1;
+const int lIr=2;
 int triggeredDistanceMeter = 0;
 int currentObstacleDistanceMeter = 0;
 int avDistanceValues[3]={0};
+int avIrValues[3]={0};
 int lDistanceValues[DIST_ARRAY_SIZE] = {0};
 int rDistanceValues[DIST_ARRAY_SIZE] = {0};
-int it_currentValueIndex = 0;
+int irRightValues[IR_ARRAY_SIZE]={0};
+int irLeftValues[IR_ARRAY_SIZE]={0};
+int it_distanceValues = 0;
+int it_irValues=0;
 
 // Collision Sensors
 int collisionSide = 0;
@@ -68,12 +77,7 @@ int main() {
 	dorobo_init();
 	trace_init();
 	adc_init();
-//	digital_init();
 	motor_init();
-
-	// Pin configuration
-//	digital_configure_pin(COLLISSION_SENSOR_LEFT, DD_CFG_INPUT_PULLUP);
-//	digital_configure_pin(COLLISSION_SENSOR_RIGHT, DD_CFG_INPUT_PULLUP);
 
 	GPIO_InitTypeDef GPIO_InitStructLeft;
 	GPIO_InitStructLeft.Pin = GPIO_PIN_14;
@@ -90,16 +94,13 @@ int main() {
 	HAL_NVIC_SetPriority(EXTI4_15_IRQn, 3, 0);
 	HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 
-	// Set initial state
-	setState(NoTarget);
-
 	// Create tasks
 	xTaskCreate(mainTask, "mainTask", 256, NULL, 2, NULL);
 	xTaskCreate(irTask, "irTask", 256, NULL, 2, NULL);
 	xTaskCreate(distanceTask, "distanceTask", 256, NULL, 2, NULL);
 
 	vTaskStartScheduler();	//start the freertos scheduler
-	return 0;								//should not be reached!
+	return 0;				//should not be reached!
 }
 
 void setState(int state) {
@@ -111,7 +112,8 @@ void setState(int state) {
 	case NoTarget:
 		resetBlindCounter();
 		stop();
-		turn(35 * lastSeen);
+		vTaskDelay(20);
+		turn(45 * lastSeen);
 		break;
 
 	case Adjusting:
@@ -125,6 +127,7 @@ void setState(int state) {
 
 	case ObstacleDetected:
 		stop();
+		vTaskDelay(20);
 
 		currentObstacleDistanceMeter = triggeredDistanceMeter;
 
@@ -139,42 +142,39 @@ void setState(int state) {
 		stop();
 		start(-60,collisionSide);	// Move back to opposite side
 		break;
+
+	case FalseTarget:
+		stop();
+		vTaskDelay(10);
+		turn(70*lastSeen);
+		vTaskDelay(70);
+		resetFalseTargetCounter();
+		setState(NoTarget);
+		break;
+
+	case ChangingPosition:
+		stop();
+		vTaskDelay(10);
+		start(70, 0);
+		turn(30*lastSeen);
+		resetBlindCounter();
+		break;
   }
 }
 
 /*
- * Right Collision sensor interruption
- */
-//void EXTI4_14_IRQHandler(void)
-//{
-//	if(digital_get_pin(COLLISSION_SENSOR_LEFT)==DD_LEVEL_HIGH){
-//		collisionSide=RIGHT_DIRECTION;
-//		setState(CollisionDetected);
-//	}
-//
-//	else if(digital_get_pin(COLLISSION_SENSOR_RIGHT)==DD_LEVEL_HIGH){
-//		collisionSide=LEFT_DIRECTION;
-//		setState(CollisionDetected);
-//	}
-//}
-
-/*
- * Right Collision sensor interruption
+ * Collision sensor interruption
  */
 void EXTI4_15_IRQHandler(void)
 {
-	if(__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_14)){
+	if(__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_14)) {
 		collisionSide=RIGHT_DIRECTION;
 		setState(CollisionDetected);
-	}
-
-	else if(__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_15)){
+	} else if(__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_15)) {
 		collisionSide=LEFT_DIRECTION;
 		setState(CollisionDetected);
 	}
-//	tracef("left %d, right %d", digital_get_pin(COLLISSION_SENSOR_LEFT), digital_get_pin(COLLISSION_SENSOR_RIGHT));
-//	collisionSide=RIGHT_DIRECTION;
-//	setState(CollisionDetected);
+
 	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_14);
 	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_15);
 }
@@ -183,21 +183,9 @@ static void distanceTask(void *pvParameters) {
 	// Read sensors
 
 	while(1){
-//		// If switch is pushed, go to CollisionDetected state
-//		if(currentState!=CollisionDetected){
-//			if(digital_get_pin(COLLISSION_SENSOR_LEFT)==DD_LEVEL_LOW){
-//				collisionSide=RIGHT_DIRECTION;
-//				setState(CollisionDetected);
-//			}
-//
-//			else if(digital_get_pin(COLLISSION_SENSOR_RIGHT)==DD_LEVEL_LOW){
-//				collisionSide=LEFT_DIRECTION;
-//				setState(CollisionDetected);
-//			}
-//		}
 		// Read distance sensors
-		rDistanceValues[it_currentValueIndex] = adc_get_value(DISTANCE_METER_RIGHT);
-		lDistanceValues[it_currentValueIndex] = adc_get_value(DISTANCE_METER_LEFT);
+		rDistanceValues[it_distanceValues] = adc_get_value(DISTANCE_METER_RIGHT);
+		lDistanceValues[it_distanceValues] = adc_get_value(DISTANCE_METER_LEFT);
 
 		// Calculate average
 		int rSum = 0;
@@ -221,7 +209,7 @@ static void distanceTask(void *pvParameters) {
 		}
 
 		// Update the iterator
-		it_currentValueIndex = (++it_currentValueIndex) % DIST_ARRAY_SIZE; 
+		it_distanceValues = (++it_distanceValues) % DIST_ARRAY_SIZE; 
 
 		vTaskDelay(10);
 	}
@@ -231,70 +219,63 @@ static void irTask(void *pvParameters) {
 
 	// FFT initialization
 	ft_init();
-
 	while(1){
-		// Read right IR
-		ft_start_sampling(IR_LEFT);
-		while(!ft_is_sampling_finished()){
-			vTaskDelay(10);
-		}
-		irLeft = ft_get_transform(DFT_FREQ125);
 
 		// Read right IR
 		ft_start_sampling(IR_RIGHT);
 		while(!ft_is_sampling_finished()){
 			vTaskDelay(10);
 		}
-		irRight = ft_get_transform(DFT_FREQ125);
+		irRightValues[it_irValues] = ft_get_transform(DFT_FREQ125);
 
+		// Read left IR
+		ft_start_sampling(IR_LEFT);
+		while(!ft_is_sampling_finished()){
+			vTaskDelay(10);
+		}
+		irLeftValues[it_irValues] = ft_get_transform(DFT_FREQ125);
+
+		int rSum=0;
+		int lSum=0;
+		for(int i=0; i<IR_ARRAY_SIZE;i++){
+			rSum+=irRightValues[i];
+			lSum+=irLeftValues[i];
+		}
+
+		avIrValues[lIr] = lSum / DIST_ARRAY_SIZE;
+		avIrValues[rIr] = rSum / DIST_ARRAY_SIZE;
+
+		tracef("level %d , %d", avIrValues[rIr], avIrValues[lIr]);
 		// Set last seen  direction
-		if(irRight>irLeft){
+		if(avIrValues[rIr]>avIrValues[lIr]){
 			lastSeen = RIGHT_DIRECTION;
 		}
-		else if(irRight<irLeft){
+		else if(avIrValues[rIr]<avIrValues[lIr]){
 			lastSeen = LEFT_DIRECTION;
 		}
 
 		updateBlindCounter();
-		vTaskDelay(20);
+		it_irValues = (++it_irValues) % IR_ARRAY_SIZE;
+		vTaskDelay(10);
 	}
 }
 
 static void mainTask(void *pvParameters){
 
+	setState(NoTarget);
 	while(1){
 		switch(currentState){
 		case NoTarget:
-			if(max(irLeft, irRight) > IR_TARGET_VALUE)
+			if(max(avIrValues[lIr], avIrValues[rIr]) > IR_TARGET_VALUE){
 				setState(Adjusting);
+				continue;
+			}
+			if(isTargetLost() && !triggeredDistanceMeter){
+				setState(ChangingPosition);
+			}
 			break;
 
 		case Adjusting:
-			if(triggeredDistanceMeter != 0) {
-				setState(ObstacleDetected);
-				continue;
-			}
-
-			if((abs(irLeft-irRight) < IR_MIN_DIFF)){
-				setState(OnCourse);
-				continue;
-			}
-				
-			int angSp = 15;
-			if(irLeft<irRight){
-				angSp = -angSp;
-			}
-			if(isStarted) {
-				angSp *= 5;
-			}
-			turn(angSp);
-
-			if(isTargetLost())
-				setState(NoTarget);
-			break;
-
-		case OnCourse:
-			tracef("blind counter: %d", blindCounter);
 			if(isTargetLost()) {
 				setState(NoTarget);
 				continue;
@@ -305,7 +286,39 @@ static void mainTask(void *pvParameters){
 				continue;
 			}
 
-			if(abs(irLeft - irRight) > IR_MIN_DIFF){
+			if((abs(avIrValues[lIr]-avIrValues[rIr]) < IR_MIN_DIFF)){
+				setState(OnCourse);
+				continue;
+			}
+				
+			int angSp = 15;
+			if(avIrValues[lIr]<avIrValues[rIr]){
+				angSp = -angSp;
+			}
+			if(isStarted) {
+				angSp *= 5;
+			}
+			turn(angSp);
+
+			break;
+
+		case OnCourse:
+			if(isTargetLost()) {
+				setState(NoTarget);
+				continue;
+			}
+
+//			if(isFalseTarget()) {
+//				setState(FalseTarget);
+//				continue;
+//			}
+
+			if(triggeredDistanceMeter != 0) {
+				setState(ObstacleDetected);
+				continue;
+			}
+
+			if(abs(avIrValues[lIr] - avIrValues[rIr]) > IR_MIN_DIFF){
 				setState(Adjusting);
 			}
 
@@ -313,6 +326,11 @@ static void mainTask(void *pvParameters){
 
 		case CollisionDetected:
 			vTaskDelay(150);
+			stop();
+			vTaskDelay(20);
+			turn(collisionSide*60);
+			vTaskDelay(40);
+			collisionSide=0;
 			setState(OnCourse);
 			break;
 
@@ -323,8 +341,24 @@ static void mainTask(void *pvParameters){
 
 			if(avDistanceValues[currentObstacleDistanceMeter] < DIST_SENSOR_OBSTACLE_VALUE) {
 				stop();
+				vTaskDelay(20);
 				setState(OnCourse);
 			}
+			break;
+
+		case ChangingPosition:
+			if(triggeredDistanceMeter != 0) {
+				setState(ObstacleDetected);
+				continue;
+			}
+			if(max(avIrValues[lIr], avIrValues[rIr]) > IR_TARGET_VALUE){
+				stop();
+				vTaskDelay(10);
+				setState(Adjusting);
+				continue;
+			}
+			if(isTargetLost())
+				setState(NoTarget);
 			break;
 		}
 
