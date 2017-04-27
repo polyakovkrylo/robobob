@@ -5,7 +5,7 @@
 #define IR_TARGET_VALUE							800
 #define IR_MIN_DIFF								150
 
-#define BLIND_COUNTER_MAX           			25
+#define BLIND_COUNTER_MAX           			30
 #define FALSE_TARGET_COUNTER_MAX        		10
 
 // IR Sensors

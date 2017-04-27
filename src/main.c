@@ -227,14 +227,14 @@ static void irTask(void *pvParameters) {
 			vTaskDelay(10);
 		}
 		irRightValues[it_irValues] = ft_get_transform(DFT_FREQ125);
-
+		tracef("level %d ", ft_get_transform(DFT_FREQ125));
 		// Read left IR
 		ft_start_sampling(IR_LEFT);
 		while(!ft_is_sampling_finished()){
 			vTaskDelay(10);
 		}
 		irLeftValues[it_irValues] = ft_get_transform(DFT_FREQ125);
-
+		tracef("level %d", ft_get_transform(DFT_FREQ125));
 		int rSum=0;
 		int lSum=0;
 		for(int i=0; i<IR_ARRAY_SIZE;i++){
