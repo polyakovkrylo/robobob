@@ -1,7 +1,5 @@
 //Code by Hector Munoz and Vladimir Poliakov.
 
-//possible improvement: entering while(1) inside robobob thread, ask for every measurement at the begining
-//and save it in a variable with a name for more easily handling.
 #include <stdlib.h>
 
 #include "FreeRTOS.h"
@@ -41,7 +39,6 @@ enum States{
 	ObstacleDetected,
 	CollisionDetected,
 	Avoiding,
-	FalseTarget,
 	ChangingPosition
 };
 
@@ -140,18 +137,9 @@ void setState(int state) {
 
 	case CollisionDetected:
 		stop();
-		start(-60,collisionSide);	// Move back to opposite side
+		start(-60,collisionSide);	// Move back from collision
 		break;
-
-	case FalseTarget:
-		stop();
-		vTaskDelay(10);
-		turn(70*lastSeen);
-		vTaskDelay(70);
-		resetFalseTargetCounter();
-		setState(NoTarget);
-		break;
-
+			
 	case ChangingPosition:
 		stop();
 		vTaskDelay(10);
@@ -227,14 +215,16 @@ static void irTask(void *pvParameters) {
 			vTaskDelay(10);
 		}
 		irRightValues[it_irValues] = ft_get_transform(DFT_FREQ125);
-		tracef("level %d ", ft_get_transform(DFT_FREQ125));
+		tracef("level right %d ", ft_get_transform(DFT_FREQ125));
+		
 		// Read left IR
 		ft_start_sampling(IR_LEFT);
 		while(!ft_is_sampling_finished()){
 			vTaskDelay(10);
 		}
 		irLeftValues[it_irValues] = ft_get_transform(DFT_FREQ125);
-		tracef("level %d", ft_get_transform(DFT_FREQ125));
+		tracef("level left %d", ft_get_transform(DFT_FREQ125));
+		
 		int rSum=0;
 		int lSum=0;
 		for(int i=0; i<IR_ARRAY_SIZE;i++){
@@ -244,8 +234,10 @@ static void irTask(void *pvParameters) {
 
 		avIrValues[lIr] = lSum / DIST_ARRAY_SIZE;
 		avIrValues[rIr] = rSum / DIST_ARRAY_SIZE;
-
 		tracef("level %d , %d", avIrValues[rIr], avIrValues[lIr]);
+		// Update iterator
+		it_irValues = (++it_irValues) % IR_ARRAY_SIZE;
+		
 		// Set last seen  direction
 		if(avIrValues[rIr]>avIrValues[lIr]){
 			lastSeen = RIGHT_DIRECTION;
@@ -255,7 +247,6 @@ static void irTask(void *pvParameters) {
 		}
 
 		updateBlindCounter();
-		it_irValues = (++it_irValues) % IR_ARRAY_SIZE;
 		vTaskDelay(10);
 	}
 }
