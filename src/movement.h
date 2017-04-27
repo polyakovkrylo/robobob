@@ -20,15 +20,11 @@ void start(int speed, int direction) {
 		case RIGHT_DIRECTION:
 		motor_set(DM_MOTOR1, speed);
 		motor_set(DM_MOTOR0, -speed);
-		// for turning while moving
-		motor_set(DM_MOTOR2, speed/5);
 		break;
 
 		case LEFT_DIRECTION:
 		motor_set(DM_MOTOR0, speed);
 		motor_set(DM_MOTOR2, -speed);
-		// for turning while moving
-		motor_set(DM_MOTOR1, -speed/5);
 		break;
 
 		default:
