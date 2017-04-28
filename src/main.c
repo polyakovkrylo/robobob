@@ -185,7 +185,7 @@ static void mainTask(void *pvParameters){
 				continue;
 			}
 
-			if(max(avIrValues[lIr], avIrValues[rIr]) > IR_TARGET_VALUE){
+			if(max(irLeft, irRight) > IR_TARGET_VALUE){
 				stop();
 				vTaskDelay(10);
 				setState(Adjusting);

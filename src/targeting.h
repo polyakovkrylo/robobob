@@ -1,14 +1,16 @@
 #ifndef TARGETING_H_
 #define TARGETING_H_
 
-#define IR_LEFT								DD_PIN_PC8
-#define IR_RIGHT							DD_PIN_PC9
+#include "obstacle.h"
+
+#define IR_LEFT					DD_PIN_PC8
+#define IR_RIGHT				DD_PIN_PC9
 
 #define IR_MAX                  1710
 #define IR_TARGET_VALUE         800
 #define IR_MIN_DIFF             200
 
-#define IR_ARRAY_SIZE						2
+#define IR_ARRAY_SIZE			2
 
 #define BLIND_COUNTER_MAX       30
 
@@ -62,7 +64,7 @@ void updateIrAverage()
 
 void setLastSeen()
 {
-  if(irRight > irLeft]) {
+  if(irRight > irLeft) {
     lastSeen = RIGHT_DIRECTION;
   }
   else if(irRight < irLeft) {

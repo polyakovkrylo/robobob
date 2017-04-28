@@ -10,14 +10,14 @@
 #define DISTANCE_METER_RIGHT				DA_ADC_CHANNEL0
 #define DISTANCE_METER_LEFT					DA_ADC_CHANNEL1
 
-#define DIST_SENSOR_MAX								3600
-#define DIST_SENSOR_MIN								250
-#define DIST_SENSOR_OBSTACLE_VALUE		800
-#define DIST_ARRAY_SIZE								5
+#define DIST_SENSOR_MAX						3600
+#define DIST_SENSOR_MIN						250
+#define DIST_SENSOR_OBSTACLE_VALUE			800
+#define DIST_ARRAY_SIZE						5
 
 // Distance meters
-const int distanceRight = 0;
-const int distanceLeft = 0;
+int distanceRight = 0;
+int distanceLeft = 0;
 
 int triggeredDistanceMeter = 0;
 int currentObstacleDistanceMeter = 0;
@@ -67,7 +67,7 @@ void updateDistanceAverage()
   it_distanceValues = (++it_distanceValues) % DIST_ARRAY_SIZE;
 }
 
-checkForTriggeredSide()
+void checkForTriggeredSide()
 {
   if(max(distanceRight, distanceLeft) > DIST_SENSOR_OBSTACLE_VALUE) {
     if(distanceLeft > distanceRight) {
