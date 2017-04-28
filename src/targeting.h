@@ -8,7 +8,7 @@
 
 #define IR_MAX                  1710
 #define IR_TARGET_VALUE         800
-#define IR_MIN_DIFF             200
+#define IR_MIN_DIFF             250
 
 #define IR_ARRAY_SIZE			2
 
@@ -55,8 +55,8 @@ void updateIrAverage()
     lSum+=irLeftValues[i];
   }
 
-  irLeft = lSum / DIST_ARRAY_SIZE;
-  irRight = rSum / DIST_ARRAY_SIZE;
+  irLeft = lSum / IR_ARRAY_SIZE;
+  irRight = rSum / IR_ARRAY_SIZE;
   tracef("level %d , %d", irLeft, irRight);
   // Update iterator
   it_irValues = (++it_irValues) % IR_ARRAY_SIZE;

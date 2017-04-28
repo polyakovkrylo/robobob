@@ -91,8 +91,10 @@ void setState(int state) {
 
 	case ChangingPosition:
 		resetBlindCounter();
+		stop();
 		vTaskDelay(10);
 		start(70, 0);
+		turn(40*-lastSeen);
 		break;
   }
 }
