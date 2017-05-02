@@ -7,10 +7,10 @@
 #define IR_RIGHT				DD_PIN_PC9
 
 #define IR_MAX                  1710
-#define IR_TARGET_VALUE         800
+#define IR_TARGET_VALUE         1000
 #define IR_MIN_DIFF             250
 
-#define IR_ARRAY_SIZE			2
+#define IR_ARRAY_SIZE			4
 
 #define BLIND_COUNTER_MAX       30
 
@@ -76,8 +76,8 @@ void updateBlindCounter()
 {
   if(min(irLeft, irRight) < IR_TARGET_VALUE) {
     blindCounter++;
-  } else {
-    blindCounter = 0;
+  } else if(blindCounter > 0){
+	 blindCounter-=3;
   }
 }
 

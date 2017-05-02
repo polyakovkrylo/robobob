@@ -64,7 +64,7 @@ void setState(int state) {
 		resetBlindCounter();
 		stop();
 		vTaskDelay(20);
-		turn(45 * lastSeen);
+		turn(45 * -lastSeen);
 		break;
 
 	case Adjusting:
@@ -169,6 +169,7 @@ static void mainTask(void *pvParameters){
 			break;
 
 		case Avoiding:
+			updateBlindCounter();
 			if(currentObstacleDistanceMeter != triggeredDistanceMeter) {
 				setState(ObstacleDetected);
 			}
